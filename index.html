@@ -34,7 +34,6 @@
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         // --- CONFIGURATION DATA ---
-        // Types: 'digital' (Traffic * CR) vs 'direct' (Transactions only)
         const INITIAL_CHANNELS = {
             web: { 
                 id: 'web', type: 'digital', name: 'Website', icon: Globe,
@@ -62,16 +61,43 @@
         const DEFAULT_LEISURE_MIX = { adult: 60, pensioner: 20, youth: 10, child: 10 };
 
         // --- UI COMPONENTS ---
+        
+        // Custom Tooltip Component - The Pop-up Bubble
+        const TooltipBubble = ({ text, position = "top" }) => (
+            React.createElement("div", { className: "hidden group-hover/tooltip:block absolute z-[100] w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl pointer-events-none transition-opacity opacity-0 group-hover/tooltip:opacity-100", 
+                style: { 
+                    bottom: position === 'top' ? '100%' : 'auto', 
+                    top: position === 'bottom' ? '100%' : 'auto',
+                    right: position === 'left' ? '100%' : '0', 
+                    marginBottom: position === 'top' ? '0.5rem' : '0',
+                    marginTop: position === 'bottom' ? '0.5rem' : '0'
+                } 
+            },
+                text,
+                // Arrow
+                React.createElement("div", { className: "absolute w-2 h-2 bg-gray-900 rotate-45",
+                    style: {
+                        bottom: position === 'top' ? '-4px' : 'auto',
+                        top: position === 'bottom' ? '-4px' : 'auto',
+                        right: '10px'
+                    }
+                })
+            )
+        );
+
         const Card = ({ children, className = "" }) => (
             React.createElement("div", { className: `bg-white rounded-none border border-gray-200 shadow-sm ${className}` }, children)
         );
 
         const SliderInput = ({ label, value, onChange, min, max, step = 1, unit = "", tooltip = "" }) => (
             React.createElement("div", { className: "mb-4" },
-                React.createElement("div", { className: "flex justify-between items-center mb-1" },
+                React.createElement("div", { className: "flex justify-between items-center mb-1 relative" },
                     React.createElement("label", { className: "text-xs font-bold text-gray-500 uppercase flex items-center gap-1" },
                         label,
-                        tooltip && React.createElement("span", { className: "text-gray-400 cursor-help", title: tooltip }, "ⓘ")
+                        tooltip && React.createElement("div", { className: "relative group/tooltip inline-block" },
+                            React.createElement("span", { className: "text-gray-400 cursor-help hover:text-arlanda-yellow transition-colors" }, "ⓘ"),
+                            React.createElement(TooltipBubble, { text: tooltip, position: "top" })
+                        )
                     ),
                     React.createElement("span", { className: "text-xs font-bold text-gray-900" }, `${value}${unit}`)
                 ),
@@ -101,8 +127,11 @@
         );
 
         const KPIBox = ({ icon: Icon, label, value, subtext, color = "gray", tooltip }) => (
-            React.createElement("div", { className: "bg-white p-4 border-l-4 border-arlanda-yellow shadow-sm relative group" },
-                tooltip && React.createElement("div", { className: "absolute top-2 right-2 text-gray-300 cursor-help group-hover:text-gray-500", title: tooltip }, "ⓘ"),
+            React.createElement("div", { className: "bg-white p-4 border-l-4 border-arlanda-yellow shadow-sm relative" },
+                tooltip && React.createElement("div", { className: "absolute top-2 right-2 relative group/tooltip" },
+                    React.createElement("div", { className: "text-gray-300 cursor-help hover:text-gray-500" }, "ⓘ"),
+                    React.createElement(TooltipBubble, { text: tooltip, position: "bottom" })
+                ),
                 React.createElement("div", { className: "flex items-center gap-2 mb-2" },
                     React.createElement("div", { className: `p-1.5 rounded-full bg-gray-100 text-gray-600` },
                         React.createElement(Icon, { className: "w-4 h-4" })
@@ -151,11 +180,9 @@
                             const restoredChannels = {};
                             Object.keys(savedState.channels).forEach(key => {
                                 const savedCh = savedState.channels[key];
-                                // We fetch the original static icon from INITIAL_CHANNELS
                                 const initialCh = INITIAL_CHANNELS[key]; 
                                 restoredChannels[key] = {
                                     ...savedCh,
-                                    // If initialCh exists, use its icon. Otherwise fallback to null
                                     icon: initialCh ? initialCh.icon : null 
                                 };
                             });
@@ -174,7 +201,6 @@
 
             // --- SHARE FUNCTION ---
             const handleShare = () => {
-                // We save the state as is. The receiver (useEffect) will handle re-attaching icons.
                 const fullState = { channels, prices, leisureMix, scenario, financials };
                 const jsonString = JSON.stringify(fullState);
                 const encoded = encodeURIComponent(jsonString);
@@ -233,17 +259,16 @@ ${scriptContent}
                 let channelYieldBiz = yieldBiz;
                 let channelYieldLei = yieldLei;
                 
-                // Determine Transactions (Digital vs Direct)
                 let transactions = 0;
-                let effectiveTraffic = traffic; // Only relevant for digital
-                let effectiveCR = cr; // Only relevant for digital
+                let effectiveTraffic = traffic;
+                let effectiveCR = cr;
 
                 if (type === 'digital') {
                      transactions = traffic * (cr / 100);
                 } else {
                      transactions = baselineTransactions;
-                     effectiveTraffic = null; // No traffic concept
-                     effectiveCR = null; // No CR concept
+                     effectiveTraffic = null;
+                     effectiveCR = null;
                 }
 
                 if (applyScenario && scenarioData.active) {
@@ -253,7 +278,6 @@ ${scriptContent}
                         const impactCR = 1 + (scenarioData.crImpact / 100);
                         const impactTraffic = 1 + (scenarioData.trafficImpact / 100);
 
-                        // Yield Impact applies to all channel types
                         if (scenarioData.targetSegment === 'business' || scenarioData.targetSegment === 'both') {
                             channelYieldBiz *= impactYield;
                         }
@@ -262,24 +286,14 @@ ${scriptContent}
                         }
 
                         if (type === 'digital') {
-                            // Digital: Traffic Volume affects Traffic, CR Uplift affects CR
                             effectiveTraffic = traffic * impactTraffic;
-                            
-                            // CR Uplift Logic (Weighted by Segment)
                             let crUpliftFactor = 1;
-                            if (scenarioData.targetSegment === 'business' || scenarioData.targetSegment === 'both') {
-                                crUpliftFactor += (bizShare/100) * (impactCR - 1);
-                            } 
-                            if (scenarioData.targetSegment === 'leisure' || scenarioData.targetSegment === 'both') {
-                                crUpliftFactor += ((100 - bizShare)/100) * (impactCR - 1);
-                            }
-                            // Note: This is a simplified blended uplift. 
+                            if (scenarioData.targetSegment === 'business' || scenarioData.targetSegment === 'both') crUpliftFactor += (bizShare/100) * (impactCR - 1);
+                            if (scenarioData.targetSegment === 'leisure' || scenarioData.targetSegment === 'both') crUpliftFactor += ((100 - bizShare)/100) * (impactCR - 1);
                             effectiveCR = cr * crUpliftFactor;
                             transactions = effectiveTraffic * (effectiveCR / 100);
 
                         } else {
-                            // Direct (Kiosk/Other): Traffic Volume slider acts as VOLUME slider
-                            // CR Slider is IGNORED for direct channels
                             transactions = baselineTransactions * impactTraffic;
                         }
                     }
@@ -293,13 +307,7 @@ ${scriptContent}
                 const revenueBiz = ticketsBiz * channelYieldBiz * tripsPerTicket;
                 const revenueLei = ticketsLei * channelYieldLei * tripsPerTicket;
                 
-                return { 
-                    transactions, 
-                    totalPax, 
-                    revenue: revenueBiz + revenueLei, 
-                    effectiveCR, 
-                    effectiveTraffic 
-                };
+                return { transactions, totalPax, revenue: revenueBiz + revenueLei, effectiveCR, effectiveTraffic };
             };
 
             const results = useMemo(() => {
@@ -326,17 +334,15 @@ ${scriptContent}
                 const investment = financials.investment;
                 const years = financials.lifespan;
                 const rate = financials.discountRate / 100;
-
-                const totalLifetimeBenefit = annualBenefit * years;
-                const netBenefit = totalLifetimeBenefit - investment;
-                const roi = investment > 0 ? (netBenefit / investment) * 100 : 0;
-                const paybackYears = annualBenefit > 0 ? investment / annualBenefit : 0;
                 
                 let pvSum = 0;
                 for (let t = 1; t <= years; t++) {
                     pvSum += annualBenefit / Math.pow(1 + rate, t);
                 }
                 const npv = pvSum - investment;
+                const roi = investment > 0 ? (npv / investment) * 100 : 0; // Using NPV based ROI for accuracy
+                const simpleRoi = investment > 0 ? ((annualBenefit * years - investment) / investment) * 100 : 0;
+                const paybackYears = annualBenefit > 0 ? investment / annualBenefit : 0;
 
                 let irr = 0;
                 if (investment > 0 && annualBenefit > 0) {
@@ -353,7 +359,7 @@ ${scriptContent}
                     irr = guess * 100;
                 }
 
-                return { annualBenefit, roi, paybackYears, npv, irr };
+                return { annualBenefit, roi: simpleRoi, paybackYears, npv, irr };
             }, [results, financials]);
 
             const updateChannel = (id, field, value) => setChannels(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
@@ -637,8 +643,8 @@ ${scriptContent}
                                     const metrics = results.channelDetails[channel.id];
                                     const isImpacted = scenario.active && (scenario.targetChannel === 'all' || scenario.targetChannel === channel.id);
                                     
-                                    return React.createElement(Card, { key: channel.id, className: `overflow-hidden ${isImpacted ? 'ring-2 ring-arlanda-yellow' : ''}` },
-                                        React.createElement("div", { className: `px-4 py-3 border-b flex justify-between items-center ${channel.id === 'web' ? 'bg-arlanda-dark text-white' : 'bg-gray-100 text-gray-700'}` },
+                                    return React.createElement(Card, { key: channel.id, className: `${isImpacted ? 'ring-2 ring-arlanda-yellow' : ''}` },
+                                        React.createElement("div", { className: `px-4 py-3 border-b flex justify-between items-center rounded-t ${channel.id === 'web' ? 'bg-arlanda-dark text-white' : 'bg-gray-100 text-gray-700'}` },
                                             React.createElement("div", { className: "flex items-center gap-2" },
                                                 channel.icon && React.createElement(channel.icon, { className: "w-4 h-4" }),
                                                 React.createElement("span", { className: "font-bold uppercase text-xs" }, channel.name)

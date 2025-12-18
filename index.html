@@ -146,7 +146,22 @@
                         const jsonString = decodeURIComponent(hash.substring(8));
                         const savedState = JSON.parse(jsonString);
                         
-                        if(savedState.channels) setChannels(savedState.channels);
+                        // FIX: Restore Icons manually because JSON kills them
+                        if(savedState.channels) {
+                            const restoredChannels = {};
+                            Object.keys(savedState.channels).forEach(key => {
+                                const savedCh = savedState.channels[key];
+                                // We fetch the original static icon from INITIAL_CHANNELS
+                                const initialCh = INITIAL_CHANNELS[key]; 
+                                restoredChannels[key] = {
+                                    ...savedCh,
+                                    // If initialCh exists, use its icon. Otherwise fallback to null
+                                    icon: initialCh ? initialCh.icon : null 
+                                };
+                            });
+                            setChannels(restoredChannels);
+                        }
+                        
                         if(savedState.prices) setPrices(savedState.prices);
                         if(savedState.leisureMix) setLeisureMix(savedState.leisureMix);
                         if(savedState.scenario) setScenario(savedState.scenario);
@@ -159,6 +174,7 @@
 
             // --- SHARE FUNCTION ---
             const handleShare = () => {
+                // We save the state as is. The receiver (useEffect) will handle re-attaching icons.
                 const fullState = { channels, prices, leisureMix, scenario, financials };
                 const jsonString = JSON.stringify(fullState);
                 const encoded = encodeURIComponent(jsonString);

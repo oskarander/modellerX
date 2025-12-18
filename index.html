@@ -5,9 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arlanda Express Revenue Modeler</title>
     <meta name="description" content="Interactive dashboard to model revenue, PAX, and ROI for marketing campaigns.">
-    <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- REACT APPLICATION -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        arlanda: {
+                            yellow: '#FFD500', // Official Arlanda Yellow
+                            dark: '#222222',   // Dark Grey/Black
+                            grey: '#4F5258',   // Slate Grey
+                            light: '#F5F5F5'   // Background
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script type="module">
 
         import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
@@ -15,7 +29,8 @@
         import { 
             TrendingUp, TrendingDown, Users, DollarSign, AlertCircle, 
             Calendar, Settings, Info, PieChart, Calculator, Clock, 
-            Activity, Share2, Link as LinkIcon, Check, Download, FileText, Code
+            Activity, Share2, Link as LinkIcon, Check, Download, FileText, Code,
+            TrainFront, Sigma
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         // --- CONFIGURATION DATA ---
@@ -30,13 +45,13 @@
 
         // --- UI COMPONENTS ---
         const Card = ({ children, className = "" }) => (
-            React.createElement("div", { className: `bg-white rounded-lg shadow-sm border border-gray-200 ${className}` }, children)
+            React.createElement("div", { className: `bg-white rounded-none border border-gray-200 shadow-sm ${className}` }, children)
         );
 
         const SliderInput = ({ label, value, onChange, min, max, step = 1, unit = "", tooltip = "" }) => (
             React.createElement("div", { className: "mb-4" },
                 React.createElement("div", { className: "flex justify-between items-center mb-1" },
-                    React.createElement("label", { className: "text-xs font-medium text-gray-600 flex items-center gap-1" },
+                    React.createElement("label", { className: "text-xs font-bold text-gray-500 uppercase flex items-center gap-1" },
                         label,
                         tooltip && React.createElement("span", { className: "text-gray-400 cursor-help", title: tooltip }, "ⓘ")
                     ),
@@ -47,20 +62,20 @@
                     min: min, max: max, step: step,
                     value: value,
                     onChange: (e) => onChange(parseFloat(e.target.value)),
-                    className: "w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                    className: "w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-arlanda-yellow"
                 })
             )
         );
 
         const NumberInput = ({ label, value, onChange, unit = "", step = 1 }) => (
             React.createElement("div", { className: "mb-4" },
-                React.createElement("label", { className: "block text-xs font-medium text-gray-600 mb-1" }, label),
+                React.createElement("label", { className: "block text-xs font-bold text-gray-500 uppercase mb-1" }, label),
                 React.createElement("div", { className: "relative" },
                     React.createElement("input", {
                         type: "number",
                         value: value, step: step,
                         onChange: (e) => onChange(parseFloat(e.target.value)),
-                        className: "block w-full text-right pr-8 pl-2 py-1 text-sm border-gray-300 border rounded focus:ring-yellow-500 focus:border-yellow-500"
+                        className: "block w-full text-right pr-8 pl-2 py-1 text-sm border-gray-300 border rounded-none focus:ring-arlanda-yellow focus:border-arlanda-yellow"
                     }),
                     React.createElement("span", { className: "absolute right-2 top-1.5 text-xs text-gray-400" }, unit)
                 )
@@ -68,10 +83,10 @@
         );
 
         const KPIBox = ({ icon: Icon, label, value, subtext, color = "gray", tooltip }) => (
-            React.createElement("div", { className: "bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative group" },
+            React.createElement("div", { className: "bg-white p-4 border-l-4 border-arlanda-yellow shadow-sm relative group" },
                 tooltip && React.createElement("div", { className: "absolute top-2 right-2 text-gray-300 cursor-help group-hover:text-gray-500", title: tooltip }, "ⓘ"),
                 React.createElement("div", { className: "flex items-center gap-2 mb-2" },
-                    React.createElement("div", { className: `p-1.5 rounded bg-${color}-100 text-${color}-600` },
+                    React.createElement("div", { className: `p-1.5 rounded-full bg-gray-100 text-gray-600` },
                         React.createElement(Icon, { className: "w-4 h-4" })
                     ),
                     React.createElement("span", { className: "text-xs font-bold uppercase text-gray-500" }, label)
@@ -110,7 +125,7 @@
                 try {
                     const hash = window.location.hash;
                     if (hash && hash.startsWith('#config=')) {
-                        const jsonString = decodeURIComponent(hash.substring(8)); // remove #config=
+                        const jsonString = decodeURIComponent(hash.substring(8));
                         const savedState = JSON.parse(jsonString);
                         
                         if(savedState.channels) setChannels(savedState.channels);
@@ -129,77 +144,39 @@
                 const fullState = { channels, prices, leisureMix, scenario, financials };
                 const jsonString = JSON.stringify(fullState);
                 const encoded = encodeURIComponent(jsonString);
-                
-                // Update URL without reloading
                 window.location.hash = `config=${encoded}`;
-                
-                // Copy to clipboard
                 navigator.clipboard.writeText(window.location.href).then(() => {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                 });
             };
 
-            // --- DOWNLOAD FUNCTIONS ---
-            const downloadFile = (filename, content, contentType) => {
-                const blob = new Blob([content], { type: contentType });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            };
-
-            const handleDownloadReadme = () => {
-                const content = `# Arlanda Express Revenue Modeler
-
-## Overview
-A React-based interactive dashboard for modeling revenue impact, PAX volume, and financial KPIs (ROI, NPV, IRR) for marketing campaigns.
-
-## Features
-- **Revenue & PAX Forecasting:** Model scenarios based on channel traffic, conversion rates, and ticket mix.
-- **Financial KPIs:** Automatically calculates Simple ROI, Payback Period, NPV, and IRR.
-- **Interactive Scenarios:** Adjust yield, conversion, and traffic impacts in real-time.
-- **Shareable:** Save and share configurations via URL.
-
-## Usage
-Simply open \`index.html\` in any modern web browser. No build steps, servers, or installation required.
-
-## Tech Stack
-- **React 18:** via ESM CDN
-- **Tailwind CSS:** via CDN
-- **Lucide Icons:** for UI elements
-`;
-                downloadFile('README.md', content, 'text/markdown');
-            };
-
             const handleDownloadHTML = () => {
-                // Determine the script content. 
-                // We access the script tag that is currently running this React code.
                 const scriptContent = document.querySelector('script[type="module"]').innerHTML;
-                
                 const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arlanda Express Revenue Modeler</title>
-    <meta name="description" content="Interactive dashboard to model revenue, PAX, and ROI for marketing campaigns.">
-    <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"><\/script>
-    <!-- REACT APPLICATION -->
+    <script>
+        tailwind.config = { theme: { extend: { colors: { arlanda: { yellow: '#FFD500', dark: '#222222', grey: '#4F5258', light: '#F5F5F5' } } } } }
+    <\/script>
     <script type="module">
 ${scriptContent}
     <\/script>
 </head>
-<body class="bg-gray-50">
+<body class="bg-arlanda-light">
     <div id="root"></div>
 </body>
 </html>`;
-                downloadFile('index.html', htmlContent, 'text/html');
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'index.html';
+                link.click();
             };
 
             // LOGIC
@@ -320,359 +297,386 @@ ${scriptContent}
             const fmtPerc = (n) => n.toFixed(1) + '%';
 
             return (
-                React.createElement("div", { className: "min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-800" },
+                React.createElement("div", { className: "min-h-screen bg-arlanda-light font-sans text-arlanda-grey" },
                     // HEADER
-                    React.createElement("div", { className: "max-w-6xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4" },
-                        React.createElement("div", null,
-                            React.createElement("h1", { className: "text-2xl font-bold text-gray-900" }, "Revenue & PAX Modelling Tool"),
-                            React.createElement("p", { className: "text-sm text-gray-500" }, "Product Owner Dashboard • Arlanda Express")
-                        ),
-                        // ACTION BUTTONS
-                        React.createElement("div", { className: "flex gap-2" },
-                            React.createElement("button", { 
-                                onClick: handleDownloadHTML,
-                                className: "flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 transition-colors"
-                            },
-                                React.createElement(Code, { className: "w-4 h-4" }), "Get Code"
-                            ),
-                            React.createElement("button", { 
-                                onClick: handleDownloadReadme,
-                                className: "flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 transition-colors"
-                            },
-                                React.createElement(FileText, { className: "w-4 h-4" }), "Get Readme"
-                            ),
-                            React.createElement("button", { 
-                                onClick: handleShare,
-                                className: `flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${copied ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`
-                            },
-                                copied ? React.createElement(Check, { className: "w-4 h-4" }) : React.createElement(Share2, { className: "w-4 h-4" }),
-                                copied ? "Copied!" : "Share"
-                            )
-                        )
-                    ),
-                    
-                    // TICKET PRICING
-                    React.createElement("div", { className: "max-w-6xl mx-auto mb-8" },
-                        React.createElement(Card, null,
-                            React.createElement("div", { className: "bg-indigo-900 text-white px-6 py-4 rounded-t-lg flex justify-between items-center" },
-                                React.createElement("div", { className: "flex items-center gap-2" },
-                                    React.createElement(PieChart, { className: "w-5 h-5" }),
-                                    React.createElement("h2", { className: "font-bold" }, "Ticket Pricing & Demographics")
-                                ),
-                                React.createElement("div", { className: "text-xs bg-indigo-800 px-3 py-1 rounded" },
-                                    "Yield Leisure: ", React.createElement("strong", null, Math.round(yieldLei), " SEK"), " / Yield Biz: ", React.createElement("strong", null, Math.round(yieldBiz), " SEK")
-                                )
-                            ),
-                            React.createElement("div", { className: "p-6 grid grid-cols-1 md:grid-cols-2 gap-8" },
+                    React.createElement("div", { className: "bg-arlanda-yellow text-black shadow-md sticky top-0 z-50" },
+                        React.createElement("div", { className: "max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4" },
+                            React.createElement("div", { className: "flex items-center gap-4" },
+                                // Logo Placeholder
+                                React.createElement("div", { className: "w-10 h-10 bg-black rounded-full flex items-center justify-center text-arlanda-yellow font-bold text-xs" }, "A-EX"),
                                 React.createElement("div", null,
-                                    React.createElement("h3", { className: "text-xs font-bold text-gray-500 uppercase mb-4 border-b pb-2" }, "Ticket Price List (Single)"),
-                                    React.createElement("div", { className: "grid grid-cols-2 gap-4" },
-                                        React.createElement(NumberInput, { label: "Adult (26-65)", value: prices.adult, onChange: v => setPrices({...prices, adult: v}), unit: "kr" }),
-                                        React.createElement(NumberInput, { label: "Pensioner (65+)", value: prices.pensioner, onChange: v => setPrices({...prices, pensioner: v}), unit: "kr" }),
-                                        React.createElement(NumberInput, { label: "Youth (18-25)", value: prices.youth, onChange: v => setPrices({...prices, youth: v}), unit: "kr" }),
-                                        React.createElement(NumberInput, { label: "Child (0-17)", value: prices.child, onChange: v => setPrices({...prices, child: v}), unit: "kr" })
-                                    )
-                                ),
-                                React.createElement("div", null,
-                                    React.createElement("h3", { className: "text-xs font-bold text-gray-500 uppercase mb-4 border-b pb-2" }, "Leisure Traveler Mix (%)"),
-                                    React.createElement("div", { className: "space-y-2" },
-                                        React.createElement("div", { className: "flex gap-2 text-xs" },
-                                            React.createElement("div", { className: "flex-1" },
-                                                React.createElement("span", { className: "block mb-1" }, "Adult"),
-                                                React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-indigo-600", min: 0, max: 100, value: leisureMix.adult, onChange: e => updateMix('adult', parseFloat(e.target.value)) }),
-                                                React.createElement("div", { className: "text-right font-bold" }, leisureMix.adult, "%")
-                                            ),
-                                            React.createElement("div", { className: "flex-1" },
-                                                React.createElement("span", { className: "block mb-1" }, "Pens"),
-                                                React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-indigo-600", min: 0, max: 100, value: leisureMix.pensioner, onChange: e => updateMix('pensioner', parseFloat(e.target.value)) }),
-                                                React.createElement("div", { className: "text-right font-bold" }, leisureMix.pensioner, "%")
-                                            )
-                                        ),
-                                        React.createElement("div", { className: "flex gap-2 text-xs" },
-                                            React.createElement("div", { className: "flex-1" },
-                                                React.createElement("span", { className: "block mb-1" }, "Youth"),
-                                                React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-indigo-600", min: 0, max: 100, value: leisureMix.youth, onChange: e => updateMix('youth', parseFloat(e.target.value)) }),
-                                                React.createElement("div", { className: "text-right font-bold" }, leisureMix.youth, "%")
-                                            ),
-                                            React.createElement("div", { className: "flex-1" },
-                                                React.createElement("span", { className: "block mb-1" }, "Child"),
-                                                React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-indigo-600", min: 0, max: 100, value: leisureMix.child, onChange: e => updateMix('child', parseFloat(e.target.value)) }),
-                                                React.createElement("div", { className: "text-right font-bold" }, leisureMix.child, "%")
-                                            )
-                                        ),
-                                        React.createElement("div", { className: "text-xs text-gray-400 pt-2 italic text-center" },
-                                            `Total: ${leisureMix.adult + leisureMix.pensioner + leisureMix.youth + leisureMix.child}% (Values normalized if != 100)`
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
-
-                    // SCENARIO & FINANCIAL CONFIG
-                    React.createElement("div", { className: "max-w-6xl mx-auto mb-8 grid grid-cols-1 md:grid-cols-3 gap-6" },
-                        React.createElement("div", { className: "md:col-span-2" },
-                            React.createElement(Card, { className: "border-l-4 border-l-yellow-400 overflow-hidden h-full" },
-                                React.createElement("div", { className: "bg-yellow-50 px-6 py-4 border-b border-yellow-100 flex justify-between items-center" },
-                                    React.createElement("div", { className: "flex items-center gap-2" },
-                                        React.createElement(Settings, { className: "w-5 h-5 text-yellow-600" }),
-                                        React.createElement("h2", { className: "font-bold text-yellow-800" }, "Scenario Assumptions")
-                                    ),
-                                    React.createElement("div", { className: "flex items-center gap-2" },
-                                        React.createElement("label", { className: "text-sm font-medium text-yellow-800" }, "Active"),
-                                        React.createElement("input", { type: "checkbox", checked: scenario.active, onChange: e => setScenario({...scenario, active: e.target.checked}), className: "w-4 h-4 accent-yellow-500" })
-                                    )
-                                ),
-                                React.createElement("div", { className: "p-6 space-y-6" },
-                                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
-                                        React.createElement("div", null,
-                                            React.createElement("label", { className: "block text-xs font-bold text-gray-500 uppercase mb-1" }, "Campaign/Feature Name"),
-                                            React.createElement("input", { type: "text", value: scenario.name, onChange: e => setScenario({...scenario, name: e.target.value}), className: "w-full border border-gray-300 rounded p-2 text-sm" })
-                                        ),
-                                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
-                                            React.createElement("div", null,
-                                                React.createElement("label", { className: "block text-xs font-bold text-gray-500 uppercase mb-1" }, "Channel Scope"),
-                                                React.createElement("select", { value: scenario.targetChannel, onChange: e => setScenario({...scenario, targetChannel: e.target.value}), className: "w-full border border-gray-300 rounded p-2 text-sm" },
-                                                    React.createElement("option", { value: "all" }, "All Channels"),
-                                                    React.createElement("option", { value: "web" }, "Website"),
-                                                    React.createElement("option", { value: "app" }, "App"),
-                                                    React.createElement("option", { value: "kiosk" }, "Kiosks")
-                                                )
-                                            ),
-                                            React.createElement("div", null,
-                                                React.createElement("label", { className: "block text-xs font-bold text-gray-500 uppercase mb-1" }, "Segment Scope"),
-                                                React.createElement("select", { value: scenario.targetSegment, onChange: e => setScenario({...scenario, targetSegment: e.target.value}), className: "w-full border border-gray-300 rounded p-2 text-sm" },
-                                                    React.createElement("option", { value: "both" }, "All Users"),
-                                                    React.createElement("option", { value: "leisure" }, "Leisure"),
-                                                    React.createElement("option", { value: "business" }, "Business")
-                                                )
-                                            )
-                                        )
-                                    ),
-                                    React.createElement("div", { className: "bg-gray-50 rounded-lg p-4 border border-gray-100" },
-                                        React.createElement("h3", { className: "text-sm font-bold text-gray-700 mb-3" }, "Impact Levers (vs Baseline)"),
-                                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-8" },
-                                            React.createElement("div", null,
-                                                React.createElement(SliderInput, { label: "Yield (Price)", value: scenario.yieldImpact, onChange: v => setScenario({...scenario, yieldImpact: v}), min: -50, max: 50, step: 1, unit: "%", tooltip: "Impact on average ticket price/yield." })
-                                            ),
-                                            React.createElement("div", null,
-                                                React.createElement(SliderInput, { label: "Conversion Rate", value: scenario.crImpact, onChange: v => setScenario({...scenario, crImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on purchase conversion." })
-                                            ),
-                                            React.createElement("div", null,
-                                                React.createElement(SliderInput, { label: "Traffic Volume", value: scenario.trafficImpact, onChange: v => setScenario({...scenario, trafficImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on visitor numbers." })
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        ),
-                        React.createElement("div", { className: "md:col-span-1" },
-                            React.createElement(Card, { className: "h-full border-l-4 border-l-green-500" },
-                                React.createElement("div", { className: "bg-green-50 px-6 py-4 border-b border-green-100" },
-                                    React.createElement("div", { className: "flex items-center gap-2" },
-                                        React.createElement(DollarSign, { className: "w-5 h-5 text-green-700" }),
-                                        React.createElement("h2", { className: "font-bold text-green-800" }, "Financial Params")
-                                    )
-                                ),
-                                React.createElement("div", { className: "p-6 space-y-4" },
-                                    React.createElement("div", null,
-                                        React.createElement(NumberInput, { label: "Investment Cost (SEK)", value: financials.investment, step: 10000, onChange: v => setFinancials({...financials, investment: v}), unit: "kr" }),
-                                        React.createElement("p", { className: "text-xs text-gray-400 mt-1" }, "Total project/campaign cost.")
-                                    ),
-                                    React.createElement("div", null,
-                                        React.createElement(SliderInput, { label: "Project Lifespan", value: financials.lifespan, onChange: v => setFinancials({...financials, lifespan: v}), min: 1, max: 5, step: 1, unit: " Years", tooltip: "Duration for NPV/ROI calculation." })
-                                    ),
-                                    React.createElement("div", null,
-                                        React.createElement(SliderInput, { label: "Discount Rate (WACC)", value: financials.discountRate, onChange: v => setFinancials({...financials, discountRate: v}), min: 0, max: 20, step: 0.5, unit: "%", tooltip: "Required rate of return for NPV." })
-                                    ),
-                                    React.createElement("div", { className: "pt-4 border-t border-gray-100" },
-                                        React.createElement("div", { className: "text-xs text-gray-500 flex justify-between" },
-                                            React.createElement("span", null, "Annual Lift (Est):"),
-                                            React.createElement("span", { className: "font-bold" }, fmtSEK(kpiResults.annualBenefit))
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
-
-                    // FINANCIAL KPIs
-                    React.createElement("div", { className: "max-w-6xl mx-auto mb-8" },
-                        React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" },
-                            React.createElement(Activity, { className: "w-5 h-5" }),
-                            "Financial Performance KPIs"
-                        ),
-                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-4 gap-4" },
-                            React.createElement(KPIBox, { 
-                                icon: TrendingUp, label: "ROI (Simple)", value: fmtPerc(kpiResults.roi), 
-                                subtext: `${financials.lifespan} Year Return`, color: kpiResults.roi > 0 ? "green" : "red",
-                                tooltip: "(Net Benefit / Investment) × 100"
-                            }),
-                            React.createElement(KPIBox, { 
-                                icon: Clock, label: "Payback Period", 
-                                value: kpiResults.paybackYears < 0.1 ? "Immediate" : kpiResults.paybackYears > financials.lifespan ? "> Lifespan" : `${kpiResults.paybackYears.toFixed(1)} Years`, 
-                                subtext: `(${(kpiResults.paybackYears * 12).toFixed(0)} Months)`, color: "blue",
-                                tooltip: "Investment / Annual Benefit"
-                            }),
-                            React.createElement(KPIBox, { 
-                                icon: DollarSign, label: "NPV", value: fmtSEK(kpiResults.npv), 
-                                subtext: `${financials.lifespan} Yr @ ${financials.discountRate}% Rate`, color: kpiResults.npv > 0 ? "green" : "red",
-                                tooltip: "Net Present Value of future cash flows"
-                            }),
-                            React.createElement(KPIBox, { 
-                                icon: Calculator, label: "IRR", value: fmtPerc(kpiResults.irr), 
-                                subtext: "Internal Rate of Return", color: kpiResults.irr > financials.discountRate ? "green" : "orange",
-                                tooltip: "Annualized return rate where NPV = 0"
-                            })
-                        )
-                    ),
-
-                    // IMPACT DASHBOARD (Revenue & PAX)
-                    React.createElement("div", { className: "max-w-6xl mx-auto mb-8" },
-                        React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" },
-                            React.createElement(Calendar, { className: "w-5 h-5" }),
-                            "Operational Impact (vs Baseline)"
-                        ),
-                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
-                            React.createElement(Card, { className: "p-5" },
-                                React.createElement("div", { className: "text-xs font-bold text-gray-400 uppercase mb-4" }, "1 Week Horizon"),
-                                React.createElement("div", { className: "space-y-3" },
-                                    React.createElement("div", { className: "flex justify-between items-end" },
-                                        React.createElement("span", { className: "text-sm text-gray-600" }, "PAX"),
-                                        React.createElement("div", { className: `text-lg font-bold ${(results.simulated.pax - results.baseline.pax) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiff((results.simulated.pax - results.baseline.pax) * 0.25))
-                                    ),
-                                    React.createElement("div", { className: "flex justify-between items-end" },
-                                        React.createElement("span", { className: "text-sm text-gray-600" }, "Revenue"),
-                                        React.createElement("div", { className: `text-lg font-bold ${(results.simulated.revenue - results.baseline.revenue) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiffSEK((results.simulated.revenue - results.baseline.revenue) * 0.25))
-                                    )
+                                    React.createElement("h1", { className: "text-xl font-bold uppercase tracking-wider text-black" }, "Revenue Modeller"),
+                                    React.createElement("p", { className: "text-xs font-bold text-black/60 uppercase" }, "Commercial Planning Tool")
                                 )
                             ),
-                            React.createElement(Card, { className: "p-5 ring-2 ring-yellow-400 ring-opacity-50" },
-                                React.createElement("div", { className: "flex justify-between items-start mb-4" },
-                                    React.createElement("div", { className: "text-xs font-bold text-gray-400 uppercase" }, "1 Month Horizon"),
-                                    React.createElement("span", { className: "bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-0.5 rounded" }, "Primary View")
+                            React.createElement("div", { className: "flex gap-2" },
+                                React.createElement("button", { onClick: handleDownloadHTML, className: "flex items-center gap-2 px-3 py-2 rounded font-medium text-sm bg-black/10 hover:bg-black/20 text-black transition-colors" },
+                                    React.createElement(Code, { className: "w-4 h-4" }), "Get Code"
                                 ),
-                                React.createElement("div", { className: "space-y-3" },
-                                    React.createElement("div", { className: "flex justify-between items-end border-b border-dashed border-gray-200 pb-2" },
-                                        React.createElement("span", { className: "text-sm text-gray-600" }, "PAX Volume"),
-                                        React.createElement("div", { className: "text-right" },
-                                            React.createElement("span", { className: "text-xs text-gray-400 block" }, fmtNum(results.simulated.pax), " Total"),
-                                            React.createElement("span", { className: `text-xl font-bold ${(results.simulated.pax - results.baseline.pax) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiff(results.simulated.pax - results.baseline.pax))
-                                        )
-                                    ),
-                                    React.createElement("div", { className: "flex justify-between items-end" },
-                                        React.createElement("span", { className: "text-sm text-gray-600" }, "Revenue"),
-                                        React.createElement("div", { className: "text-right" },
-                                            React.createElement("span", { className: "text-xs text-gray-400 block" }, fmtSEK(results.simulated.revenue), " Total"),
-                                            React.createElement("span", { className: `text-xl font-bold ${(results.simulated.revenue - results.baseline.revenue) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiffSEK(results.simulated.revenue - results.baseline.revenue))
-                                        )
-                                    )
-                                )
-                            ),
-                            React.createElement(Card, { className: "p-5" },
-                                React.createElement("div", { className: "text-xs font-bold text-gray-400 uppercase mb-4" }, "12 Months Horizon"),
-                                React.createElement("div", { className: "space-y-3" },
-                                    React.createElement("div", { className: "flex justify-between items-end" },
-                                        React.createElement("span", { className: "text-sm text-gray-600" }, "PAX"),
-                                        React.createElement("div", { className: `text-lg font-bold ${(results.simulated.pax - results.baseline.pax) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiff((results.simulated.pax - results.baseline.pax) * 12))
-                                    ),
-                                    React.createElement("div", { className: "flex justify-between items-end" },
-                                        React.createElement("span", { className: "text-sm text-gray-600" }, "Revenue"),
-                                        React.createElement("div", { className: `text-lg font-bold ${(results.simulated.revenue - results.baseline.revenue) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiffSEK((results.simulated.revenue - results.baseline.revenue) * 12))
-                                    )
+                                React.createElement("button", { onClick: handleShare, className: "flex items-center gap-2 px-4 py-2 rounded font-bold text-sm transition-all bg-black text-white hover:bg-gray-800" },
+                                    copied ? React.createElement(Check, { className: "w-4 h-4" }) : React.createElement(Share2, { className: "w-4 h-4" }),
+                                    copied ? "Copied!" : "Share"
                                 )
                             )
                         )
                     ),
                     
-                    // CHANNELS
-                    React.createElement("div", { className: "max-w-6xl mx-auto" },
-                        React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" },
-                            React.createElement(Settings, { className: "w-5 h-5" }),
-                            "Channel Baselines (Monthly)"
-                        ),
-                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-6" },
-                            Object.values(channels).map(channel => {
-                                const metrics = results.channelDetails[channel.id];
-                                const isImpacted = scenario.active && (scenario.targetChannel === 'all' || scenario.targetChannel === channel.id);
-                                return React.createElement(Card, { key: channel.id, className: `overflow-hidden ${isImpacted ? 'ring-1 ring-yellow-400' : ''}` },
-                                    React.createElement("div", { className: `px-4 py-3 border-b flex justify-between items-center ${channel.id === 'web' ? 'bg-gray-800 text-white' : channel.id === 'app' ? 'bg-gray-600 text-white' : 'bg-gray-400 text-white'}` },
-                                        React.createElement("span", { className: "font-bold" }, channel.name),
-                                        isImpacted && React.createElement("span", { className: "text-xs bg-yellow-400 text-black px-2 py-0.5 rounded font-bold" }, "Active Target")
+                    React.createElement("div", { className: "max-w-7xl mx-auto p-6" },
+                    
+                        // TICKET PRICING
+                        React.createElement("div", { className: "mb-8" },
+                            React.createElement(Card, null,
+                                React.createElement("div", { className: "bg-arlanda-dark text-white px-6 py-4 flex justify-between items-center" },
+                                    React.createElement("div", { className: "flex items-center gap-2" },
+                                        React.createElement(PieChart, { className: "w-5 h-5 text-arlanda-yellow" }),
+                                        React.createElement("h2", { className: "font-bold uppercase tracking-wide" }, "Ticket Pricing & Demographics")
                                     ),
-                                    React.createElement("div", { className: "p-4 space-y-6" },
-                                        React.createElement("div", null,
-                                            React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Traffic & Conversion"),
-                                            React.createElement(NumberInput, { label: "Monthly Traffic", value: channel.traffic, onChange: v => updateChannel(channel.id, 'traffic', v) }),
-                                            isImpacted && metrics.sim.effectiveTraffic !== channel.traffic && 
-                                                React.createElement("div", { className: "mb-3 text-right" },
-                                                    React.createElement("span", { className: "text-xs text-gray-500 mr-1" }, "Simulated Traffic:"),
-                                                    React.createElement("span", { className: `text-xs font-bold ${metrics.sim.effectiveTraffic > channel.traffic ? 'text-green-600' : 'text-red-600'}` }, 
-                                                        `${fmtNum(metrics.sim.effectiveTraffic)} (${fmtDiff(metrics.sim.effectiveTraffic - channel.traffic)})`
+                                    React.createElement("div", { className: "text-xs bg-white/10 px-3 py-1 rounded" },
+                                        "Yield Leisure: ", React.createElement("strong", { className: "text-arlanda-yellow" }, Math.round(yieldLei), " SEK"), " / Yield Biz: ", React.createElement("strong", { className: "text-arlanda-yellow" }, Math.round(yieldBiz), " SEK")
+                                    )
+                                ),
+                                React.createElement("div", { className: "p-6 grid grid-cols-1 md:grid-cols-2 gap-8" },
+                                    React.createElement("div", null,
+                                        React.createElement("h3", { className: "text-xs font-bold text-gray-400 uppercase mb-4 border-b pb-2" }, "Ticket Price List (Single)"),
+                                        React.createElement("div", { className: "grid grid-cols-2 gap-4" },
+                                            React.createElement(NumberInput, { label: "Adult (26-65)", value: prices.adult, onChange: v => setPrices({...prices, adult: v}), unit: "kr" }),
+                                            React.createElement(NumberInput, { label: "Pensioner (65+)", value: prices.pensioner, onChange: v => setPrices({...prices, pensioner: v}), unit: "kr" }),
+                                            React.createElement(NumberInput, { label: "Youth (18-25)", value: prices.youth, onChange: v => setPrices({...prices, youth: v}), unit: "kr" }),
+                                            React.createElement(NumberInput, { label: "Child (0-17)", value: prices.child, onChange: v => setPrices({...prices, child: v}), unit: "kr" })
+                                        )
+                                    ),
+                                    React.createElement("div", null,
+                                        React.createElement("h3", { className: "text-xs font-bold text-gray-400 uppercase mb-4 border-b pb-2" }, "Leisure Traveler Mix (%)"),
+                                        React.createElement("div", { className: "space-y-4" },
+                                            React.createElement("div", { className: "grid grid-cols-2 gap-4 text-xs" },
+                                                React.createElement("div", null,
+                                                    React.createElement("span", { className: "block mb-1 font-bold" }, "Adult"),
+                                                    React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-arlanda-yellow", min: 0, max: 100, value: leisureMix.adult, onChange: e => updateMix('adult', parseFloat(e.target.value)) }),
+                                                    React.createElement("div", { className: "text-right font-bold mt-1" }, leisureMix.adult, "%")
+                                                ),
+                                                React.createElement("div", null,
+                                                    React.createElement("span", { className: "block mb-1 font-bold" }, "Pensioner"),
+                                                    React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-arlanda-yellow", min: 0, max: 100, value: leisureMix.pensioner, onChange: e => updateMix('pensioner', parseFloat(e.target.value)) }),
+                                                    React.createElement("div", { className: "text-right font-bold mt-1" }, leisureMix.pensioner, "%")
+                                                )
+                                            ),
+                                            React.createElement("div", { className: "grid grid-cols-2 gap-4 text-xs" },
+                                                React.createElement("div", null,
+                                                    React.createElement("span", { className: "block mb-1 font-bold" }, "Youth"),
+                                                    React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-arlanda-yellow", min: 0, max: 100, value: leisureMix.youth, onChange: e => updateMix('youth', parseFloat(e.target.value)) }),
+                                                    React.createElement("div", { className: "text-right font-bold mt-1" }, leisureMix.youth, "%")
+                                                ),
+                                                React.createElement("div", null,
+                                                    React.createElement("span", { className: "block mb-1 font-bold" }, "Child"),
+                                                    React.createElement("input", { type: "range", className: "w-full h-1 bg-gray-200 rounded accent-arlanda-yellow", min: 0, max: 100, value: leisureMix.child, onChange: e => updateMix('child', parseFloat(e.target.value)) }),
+                                                    React.createElement("div", { className: "text-right font-bold mt-1" }, leisureMix.child, "%")
+                                                )
+                                            ),
+                                            React.createElement("div", { className: "text-xs text-gray-400 pt-2 italic text-center" },
+                                                `Total: ${leisureMix.adult + leisureMix.pensioner + leisureMix.youth + leisureMix.child}% (Values normalized if != 100)`
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+
+                        // SCENARIO & FINANCIAL CONFIG
+                        React.createElement("div", { className: "mb-8 grid grid-cols-1 md:grid-cols-3 gap-6" },
+                            React.createElement("div", { className: "md:col-span-2" },
+                                React.createElement(Card, { className: "border-l-4 border-l-arlanda-yellow h-full" },
+                                    React.createElement("div", { className: "bg-yellow-50 px-6 py-4 border-b border-yellow-100 flex justify-between items-center" },
+                                        React.createElement("div", { className: "flex items-center gap-2" },
+                                            React.createElement(Settings, { className: "w-5 h-5 text-yellow-600" }),
+                                            React.createElement("h2", { className: "font-bold text-yellow-800 uppercase" }, "Scenario Assumptions")
+                                        ),
+                                        React.createElement("div", { className: "flex items-center gap-2" },
+                                            React.createElement("label", { className: "text-xs font-bold uppercase text-yellow-800" }, "Active"),
+                                            React.createElement("input", { type: "checkbox", checked: scenario.active, onChange: e => setScenario({...scenario, active: e.target.checked}), className: "w-4 h-4 accent-arlanda-yellow" })
+                                        )
+                                    ),
+                                    React.createElement("div", { className: "p-6 space-y-6" },
+                                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                                            React.createElement("div", null,
+                                                React.createElement("label", { className: "block text-xs font-bold text-gray-400 uppercase mb-1" }, "Campaign/Feature Name"),
+                                                React.createElement("input", { type: "text", value: scenario.name, onChange: e => setScenario({...scenario, name: e.target.value}), className: "w-full border-b-2 border-gray-200 bg-transparent py-1 font-bold text-gray-700 focus:border-arlanda-yellow outline-none transition" })
+                                            ),
+                                            React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                                                React.createElement("div", null,
+                                                    React.createElement("label", { className: "block text-xs font-bold text-gray-400 uppercase mb-1" }, "Channel Scope"),
+                                                    React.createElement("select", { value: scenario.targetChannel, onChange: e => setScenario({...scenario, targetChannel: e.target.value}), className: "w-full border border-gray-300 p-2 text-sm" },
+                                                        React.createElement("option", { value: "all" }, "All Channels"),
+                                                        React.createElement("option", { value: "web" }, "Website"),
+                                                        React.createElement("option", { value: "app" }, "App"),
+                                                        React.createElement("option", { value: "kiosk" }, "Kiosks")
                                                     )
                                                 ),
-                                            React.createElement("div", { className: "flex gap-4" },
-                                                React.createElement("div", { className: "flex-1" },
-                                                    React.createElement(NumberInput, { label: "Baseline CR (%)", value: channel.cr, onChange: v => updateChannel(channel.id, 'cr', v) })
+                                                React.createElement("div", null,
+                                                    React.createElement("label", { className: "block text-xs font-bold text-gray-400 uppercase mb-1" }, "Segment Scope"),
+                                                    React.createElement("select", { value: scenario.targetSegment, onChange: e => setScenario({...scenario, targetSegment: e.target.value}), className: "w-full border border-gray-300 p-2 text-sm" },
+                                                        React.createElement("option", { value: "both" }, "All Users"),
+                                                        React.createElement("option", { value: "leisure" }, "Leisure"),
+                                                        React.createElement("option", { value: "business" }, "Business")
+                                                    )
+                                                )
+                                            )
+                                        ),
+                                        React.createElement("div", { className: "bg-gray-50 p-4 border border-gray-100" },
+                                            React.createElement("h3", { className: "text-xs font-bold text-gray-400 uppercase mb-4" }, "Impact Levers (vs Baseline)"),
+                                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-8" },
+                                                React.createElement("div", null,
+                                                    React.createElement(SliderInput, { label: "Yield (Price)", value: scenario.yieldImpact, onChange: v => setScenario({...scenario, yieldImpact: v}), min: -50, max: 50, step: 1, unit: "%", tooltip: "Impact on average ticket price/yield." })
                                                 ),
-                                                React.createElement("div", { className: "flex-1 pt-6" },
-                                                    isImpacted && metrics.sim.effectiveCR !== metrics.base.effectiveCR && 
-                                                    React.createElement("div", { className: "text-xs font-bold text-blue-600 bg-blue-50 p-1 rounded text-center" }, `Scenario: ${metrics.sim.effectiveCR.toFixed(1)}%`)
-                                                )
-                                            )
-                                        ),
-                                        React.createElement("div", null,
-                                            React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Segmentation"),
-                                            React.createElement(SliderInput, { label: "Business / Leisure Split", value: channel.bizShare, onChange: v => updateChannel(channel.id, 'bizShare', v), min: 0, max: 100, unit: "%", tooltip: `${channel.bizShare}% Business, ${100-channel.bizShare}% Leisure` }),
-                                            React.createElement("div", { className: "grid grid-cols-2 gap-2 text-xs text-center mb-4" },
-                                                React.createElement("div", { className: "bg-slate-100 p-1 rounded" }, `Biz: ${channel.bizShare}%`),
-                                                React.createElement("div", { className: "bg-orange-50 p-1 rounded" }, `Lei: ${100-channel.bizShare}%`)
-                                            )
-                                        ),
-                                        React.createElement("div", null,
-                                            React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Purchase Behavior"),
-                                            React.createElement(SliderInput, { label: "% Buying Return Ticket", value: channel.returnMix, onChange: v => updateChannel(channel.id, 'returnMix', v), min: 0, max: 100, unit: "%" }),
-                                            React.createElement(SliderInput, { label: "Avg Travelers/Trans", value: channel.avgGroupSize, onChange: v => updateChannel(channel.id, 'avgGroupSize', v), min: 1.0, max: 4.0, step: 0.1 })
-                                        ),
-                                        React.createElement("div", { className: "bg-gray-50 p-3 rounded border border-gray-200 space-y-1" },
-                                            React.createElement("div", { className: "flex justify-between text-sm" },
-                                                React.createElement("span", { className: "text-gray-500" }, "Est. PAX:"),
-                                                React.createElement("span", { className: "font-bold" },
-                                                    fmtNum(metrics.sim.totalPax),
-                                                    isImpacted && metrics.sim.totalPax !== metrics.base.totalPax &&
-                                                    React.createElement("span", { className: `ml-1 text-xs ${metrics.sim.totalPax > metrics.base.totalPax ? 'text-green-600' : 'text-red-600'}` }, `(${fmtDiff(metrics.sim.totalPax - metrics.base.totalPax)})`)
-                                                )
-                                            ),
-                                            React.createElement("div", { className: "flex justify-between text-sm" },
-                                                React.createElement("span", { className: "text-gray-500" }, "Est. Rev:"),
-                                                React.createElement("span", { className: "font-bold" },
-                                                    fmtSEK(metrics.sim.revenue),
-                                                    isImpacted && metrics.sim.revenue !== metrics.base.revenue &&
-                                                    React.createElement("span", { className: `ml-1 text-xs ${metrics.sim.revenue > metrics.base.revenue ? 'text-green-600' : 'text-red-600'}` }, `(${fmtDiff(metrics.sim.revenue - metrics.base.revenue)})`)
+                                                React.createElement("div", null,
+                                                    React.createElement(SliderInput, { label: "Conversion Rate", value: scenario.crImpact, onChange: v => setScenario({...scenario, crImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on purchase conversion." })
+                                                ),
+                                                React.createElement("div", null,
+                                                    React.createElement(SliderInput, { label: "Traffic Volume", value: scenario.trafficImpact, onChange: v => setScenario({...scenario, trafficImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on visitor numbers." })
                                                 )
                                             )
                                         )
                                     )
-                                );
-                            })
-                        )
-                    ),
-                    
-                    // LOGIC FOOTER
-                    React.createElement("div", { className: "max-w-6xl mx-auto mt-12 pt-6 border-t border-gray-200 text-sm text-gray-500" },
-                        React.createElement("h4", { className: "font-bold text-gray-700 mb-2 flex items-center gap-2" },
-                            React.createElement(Info, { className: "w-4 h-4" }), "Calculation Logic"
-                        ),
-                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-8" },
-                            React.createElement("div", null,
-                                React.createElement("h5", { className: "font-bold mb-1 text-xs uppercase text-gray-400" }, "Operational"),
-                                React.createElement("p", { className: "mb-2" }, React.createElement("strong", { className: "text-gray-700" }, "Yield: "), "Weighted avg price based on demographics."),
-                                React.createElement("p", null, React.createElement("strong", { className: "text-gray-700" }, "PAX Formula: "), "Transactions × Avg Travelers × (Return Mix Factor)")
+                                )
                             ),
-                            React.createElement("div", null,
-                                React.createElement("h5", { className: "font-bold mb-1 text-xs uppercase text-gray-400" }, "Financial"),
-                                React.createElement("p", { className: "mb-1" }, React.createElement("strong", { className: "text-gray-700" }, "ROI: "), "((Annual Benefit × Lifespan) - Investment) / Investment"),
-                                React.createElement("p", { className: "mb-1" }, React.createElement("strong", { className: "text-gray-700" }, "NPV: "), "Sum of future cash flows discounted by WACC rate.")
+                            React.createElement("div", { className: "md:col-span-1" },
+                                React.createElement(Card, { className: "h-full border-t-4 border-t-arlanda-dark" },
+                                    React.createElement("div", { className: "bg-gray-100 px-6 py-4 border-b border-gray-200" },
+                                        React.createElement("div", { className: "flex items-center gap-2" },
+                                            React.createElement(DollarSign, { className: "w-5 h-5 text-gray-700" }),
+                                            React.createElement("h2", { className: "font-bold text-gray-800 uppercase" }, "Financial Params")
+                                        )
+                                    ),
+                                    React.createElement("div", { className: "p-6 space-y-4" },
+                                        React.createElement("div", null,
+                                            React.createElement(NumberInput, { label: "Investment Cost (SEK)", value: financials.investment, step: 10000, onChange: v => setFinancials({...financials, investment: v}), unit: "kr" }),
+                                            React.createElement("p", { className: "text-xs text-gray-400 mt-1" }, "Total project/campaign cost.")
+                                        ),
+                                        React.createElement("div", null,
+                                            React.createElement(SliderInput, { label: "Project Lifespan", value: financials.lifespan, onChange: v => setFinancials({...financials, lifespan: v}), min: 1, max: 5, step: 1, unit: " Years", tooltip: "Duration for NPV/ROI calculation." })
+                                        ),
+                                        React.createElement("div", null,
+                                            React.createElement(SliderInput, { label: "Discount Rate (WACC)", value: financials.discountRate, onChange: v => setFinancials({...financials, discountRate: v}), min: 0, max: 20, step: 0.5, unit: "%", tooltip: "Required rate of return for NPV." })
+                                        ),
+                                        React.createElement("div", { className: "pt-4 border-t border-gray-100" },
+                                            React.createElement("div", { className: "text-xs text-gray-500 flex justify-between" },
+                                                React.createElement("span", null, "Annual Lift (Est):"),
+                                                React.createElement("span", { className: "font-bold text-gray-900" }, fmtSEK(kpiResults.annualBenefit))
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+
+                        // FINANCIAL KPIs
+                        React.createElement("div", { className: "mb-8" },
+                            React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" },
+                                React.createElement(Activity, { className: "w-5 h-5" }),
+                                "Financial Performance KPIs"
+                            ),
+                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-4 gap-4" },
+                                React.createElement(KPIBox, { 
+                                    icon: TrendingUp, label: "ROI (Simple)", value: fmtPerc(kpiResults.roi), 
+                                    subtext: `${financials.lifespan} Year Return`, color: kpiResults.roi > 0 ? "green" : "red",
+                                    tooltip: "(Net Benefit / Investment) × 100"
+                                }),
+                                React.createElement(KPIBox, { 
+                                    icon: Clock, label: "Payback Period", 
+                                    value: kpiResults.paybackYears < 0.1 ? "Immediate" : kpiResults.paybackYears > financials.lifespan ? "> Lifespan" : `${kpiResults.paybackYears.toFixed(1)} Years`, 
+                                    subtext: `(${(kpiResults.paybackYears * 12).toFixed(0)} Months)`, color: "blue",
+                                    tooltip: "Investment / Annual Benefit"
+                                }),
+                                React.createElement(KPIBox, { 
+                                    icon: DollarSign, label: "NPV", value: fmtSEK(kpiResults.npv), 
+                                    subtext: `${financials.lifespan} Yr @ ${financials.discountRate}% Rate`, color: kpiResults.npv > 0 ? "green" : "red",
+                                    tooltip: "Net Present Value of future cash flows"
+                                }),
+                                React.createElement(KPIBox, { 
+                                    icon: Calculator, label: "IRR", value: fmtPerc(kpiResults.irr), 
+                                    subtext: "Internal Rate of Return", color: kpiResults.irr > financials.discountRate ? "green" : "orange",
+                                    tooltip: "Annualized return rate where NPV = 0"
+                                })
+                            )
+                        ),
+
+                        // IMPACT DASHBOARD (Revenue & PAX)
+                        React.createElement("div", { className: "mb-8" },
+                            React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" },
+                                React.createElement(Calendar, { className: "w-5 h-5" }),
+                                "Operational Impact (vs Baseline)"
+                            ),
+                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                                React.createElement(Card, { className: "p-5" },
+                                    React.createElement("div", { className: "text-xs font-bold text-gray-400 uppercase mb-4" }, "1 Week Horizon"),
+                                    React.createElement("div", { className: "space-y-3" },
+                                        React.createElement("div", { className: "flex justify-between items-end" },
+                                            React.createElement("span", { className: "text-sm text-gray-600 font-bold" }, "PAX"),
+                                            React.createElement("div", { className: `text-lg font-bold ${(results.simulated.pax - results.baseline.pax) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiff((results.simulated.pax - results.baseline.pax) * 0.25))
+                                        ),
+                                        React.createElement("div", { className: "flex justify-between items-end" },
+                                            React.createElement("span", { className: "text-sm text-gray-600 font-bold" }, "Revenue"),
+                                            React.createElement("div", { className: `text-lg font-bold ${(results.simulated.revenue - results.baseline.revenue) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiffSEK((results.simulated.revenue - results.baseline.revenue) * 0.25))
+                                        )
+                                    )
+                                ),
+                                React.createElement(Card, { className: "p-5 ring-4 ring-arlanda-yellow ring-opacity-20" },
+                                    React.createElement("div", { className: "flex justify-between items-start mb-4" },
+                                        React.createElement("div", { className: "text-xs font-bold text-gray-400 uppercase" }, "1 Month Horizon"),
+                                        React.createElement("span", { className: "bg-arlanda-yellow text-black text-[10px] uppercase font-bold px-2 py-0.5" }, "Primary View")
+                                    ),
+                                    React.createElement("div", { className: "space-y-3" },
+                                        React.createElement("div", { className: "flex justify-between items-end border-b border-dashed border-gray-200 pb-2" },
+                                            React.createElement("span", { className: "text-sm text-gray-600 font-bold" }, "PAX Volume"),
+                                            React.createElement("div", { className: "text-right" },
+                                                React.createElement("span", { className: "text-xs text-gray-400 block" }, fmtNum(results.simulated.pax), " Total"),
+                                                React.createElement("span", { className: `text-xl font-bold ${(results.simulated.pax - results.baseline.pax) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiff(results.simulated.pax - results.baseline.pax))
+                                            )
+                                        ),
+                                        React.createElement("div", { className: "flex justify-between items-end" },
+                                            React.createElement("span", { className: "text-sm text-gray-600 font-bold" }, "Revenue"),
+                                            React.createElement("div", { className: "text-right" },
+                                                React.createElement("span", { className: "text-xs text-gray-400 block" }, fmtSEK(results.simulated.revenue), " Total"),
+                                                React.createElement("span", { className: `text-xl font-bold ${(results.simulated.revenue - results.baseline.revenue) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiffSEK(results.simulated.revenue - results.baseline.revenue))
+                                            )
+                                        )
+                                    )
+                                ),
+                                React.createElement(Card, { className: "p-5" },
+                                    React.createElement("div", { className: "text-xs font-bold text-gray-400 uppercase mb-4" }, "12 Months Horizon"),
+                                    React.createElement("div", { className: "space-y-3" },
+                                        React.createElement("div", { className: "flex justify-between items-end" },
+                                            React.createElement("span", { className: "text-sm text-gray-600 font-bold" }, "PAX"),
+                                            React.createElement("div", { className: `text-lg font-bold ${(results.simulated.pax - results.baseline.pax) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiff((results.simulated.pax - results.baseline.pax) * 12))
+                                        ),
+                                        React.createElement("div", { className: "flex justify-between items-end" },
+                                            React.createElement("span", { className: "text-sm text-gray-600 font-bold" }, "Revenue"),
+                                            React.createElement("div", { className: `text-lg font-bold ${(results.simulated.revenue - results.baseline.revenue) >= 0 ? 'text-green-600' : 'text-red-600'}` }, fmtDiffSEK((results.simulated.revenue - results.baseline.revenue) * 12))
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                        
+                        // CHANNELS
+                        React.createElement("div", null,
+                            React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-4 flex items-center gap-2" },
+                                React.createElement(Settings, { className: "w-5 h-5" }),
+                                "Channel Baselines (Monthly)"
+                            ),
+                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-6" },
+                                Object.values(channels).map(channel => {
+                                    const metrics = results.channelDetails[channel.id];
+                                    const isImpacted = scenario.active && (scenario.targetChannel === 'all' || scenario.targetChannel === channel.id);
+                                    return React.createElement(Card, { key: channel.id, className: `overflow-hidden ${isImpacted ? 'ring-2 ring-arlanda-yellow' : ''}` },
+                                        React.createElement("div", { className: `px-4 py-3 border-b flex justify-between items-center ${channel.id === 'web' ? 'bg-arlanda-dark text-white' : 'bg-gray-100 text-gray-700'}` },
+                                            React.createElement("span", { className: "font-bold uppercase" }, channel.name),
+                                            isImpacted && React.createElement("span", { className: "text-[10px] bg-arlanda-yellow text-black px-2 py-0.5 rounded font-bold uppercase" }, "Active Target")
+                                        ),
+                                        React.createElement("div", { className: "p-4 space-y-6" },
+                                            React.createElement("div", null,
+                                                React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Traffic & Conversion"),
+                                                React.createElement(NumberInput, { label: "Monthly Traffic", value: channel.traffic, onChange: v => updateChannel(channel.id, 'traffic', v) }),
+                                                isImpacted && metrics.sim.effectiveTraffic !== channel.traffic && 
+                                                    React.createElement("div", { className: "mb-3 text-right" },
+                                                        React.createElement("span", { className: "text-xs text-gray-500 mr-1" }, "Simulated Traffic:"),
+                                                        React.createElement("span", { className: `text-xs font-bold ${metrics.sim.effectiveTraffic > channel.traffic ? 'text-green-600' : 'text-red-600'}` }, 
+                                                            `${fmtNum(metrics.sim.effectiveTraffic)} (${fmtDiff(metrics.sim.effectiveTraffic - channel.traffic)})`
+                                                        )
+                                                    ),
+                                                React.createElement("div", { className: "flex gap-4" },
+                                                    React.createElement("div", { className: "flex-1" },
+                                                        React.createElement(NumberInput, { label: "Baseline CR (%)", value: channel.cr, onChange: v => updateChannel(channel.id, 'cr', v) })
+                                                    ),
+                                                    React.createElement("div", { className: "flex-1 pt-6" },
+                                                        isImpacted && metrics.sim.effectiveCR !== metrics.base.effectiveCR && 
+                                                        React.createElement("div", { className: "text-xs font-bold text-gray-700 bg-arlanda-yellow p-1 rounded text-center" }, `Scenario: ${metrics.sim.effectiveCR.toFixed(1)}%`)
+                                                    )
+                                                )
+                                            ),
+                                            React.createElement("div", null,
+                                                React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Segmentation"),
+                                                React.createElement(SliderInput, { label: "Business / Leisure Split", value: channel.bizShare, onChange: v => updateChannel(channel.id, 'bizShare', v), min: 0, max: 100, unit: "%", tooltip: `${channel.bizShare}% Business, ${100-channel.bizShare}% Leisure` }),
+                                                React.createElement("div", { className: "grid grid-cols-2 gap-2 text-xs text-center mb-4" },
+                                                    React.createElement("div", { className: "bg-gray-100 p-1 rounded" }, `Biz: ${channel.bizShare}%`),
+                                                    React.createElement("div", { className: "bg-gray-100 p-1 rounded" }, `Lei: ${100-channel.bizShare}%`)
+                                                )
+                                            ),
+                                            React.createElement("div", null,
+                                                React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Purchase Behavior"),
+                                                React.createElement(SliderInput, { label: "% Buying Return Ticket", value: channel.returnMix, onChange: v => updateChannel(channel.id, 'returnMix', v), min: 0, max: 100, unit: "%" }),
+                                                React.createElement(SliderInput, { label: "Avg Travelers/Trans", value: channel.avgGroupSize, onChange: v => updateChannel(channel.id, 'avgGroupSize', v), min: 1.0, max: 4.0, step: 0.1 })
+                                            ),
+                                            React.createElement("div", { className: "bg-gray-50 p-3 border border-gray-100 space-y-1" },
+                                                React.createElement("div", { className: "flex justify-between text-sm" },
+                                                    React.createElement("span", { className: "text-gray-500 font-bold" }, "Est. PAX:"),
+                                                    React.createElement("span", { className: "font-bold" },
+                                                        fmtNum(metrics.sim.totalPax),
+                                                        isImpacted && metrics.sim.totalPax !== metrics.base.totalPax &&
+                                                        React.createElement("span", { className: `ml-1 text-xs ${metrics.sim.totalPax > metrics.base.totalPax ? 'text-green-600' : 'text-red-600'}` }, `(${fmtDiff(metrics.sim.totalPax - metrics.base.totalPax)})`)
+                                                    )
+                                                ),
+                                                React.createElement("div", { className: "flex justify-between text-sm" },
+                                                    React.createElement("span", { className: "text-gray-500 font-bold" }, "Est. Rev:"),
+                                                    React.createElement("span", { className: "font-bold" },
+                                                        fmtSEK(metrics.sim.revenue),
+                                                        isImpacted && metrics.sim.revenue !== metrics.base.revenue &&
+                                                        React.createElement("span", { className: `ml-1 text-xs ${metrics.sim.revenue > metrics.base.revenue ? 'text-green-600' : 'text-red-600'}` }, `(${fmtDiff(metrics.sim.revenue - metrics.base.revenue)})`)
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    );
+                                })
+                            )
+                        ),
+
+                        // --- NEW CFO / LOGIC FOOTER ---
+                        React.createElement("div", { className: "mt-12 border-t-2 border-gray-200 pt-8 pb-12" },
+                            React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-6 flex items-center gap-2" },
+                                React.createElement(Info, { className: "w-5 h-5 text-arlanda-yellow" }),
+                                "Methodology & Calculation Logic"
+                            ),
+                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-8 text-sm text-gray-600" },
+                                // Operational Logic
+                                React.createElement("div", null,
+                                    React.createElement("h4", { className: "font-bold text-gray-900 uppercase mb-3 text-xs tracking-wider" }, "Operational Metrics"),
+                                    React.createElement("ul", { className: "space-y-3" },
+                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Total PAX (Passengers)"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Traffic × CR% × Avg Group Size × Trip Factor"),
+                                            React.createElement("div", { className: "mt-1 text-xs italic" }, "*Trip Factor accounts for return tickets (1 Return Ticket = 2 PAX trips).")
+                                        ),
+                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Weighted Yield (Avg Price)"),
+                                            React.createElement("div", { className: "text-xs space-y-1" },
+                                                React.createElement("div", null, React.createElement("strong", null, "Business Segment:"), " Always priced at Adult Single Rate."),
+                                                React.createElement("div", null, React.createElement("strong", null, "Leisure Segment:"), " Weighted average of Adult/Pensioner/Youth/Child mix.")
+                                            )
+                                        )
+                                    )
+                                ),
+                                // Financial Logic
+                                React.createElement("div", null,
+                                    React.createElement("h4", { className: "font-bold text-gray-900 uppercase mb-3 text-xs tracking-wider" }, "Financial KPI Formulas"),
+                                    React.createElement("ul", { className: "space-y-3" },
+                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "ROI (Return on Investment)"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "((Annual Benefit × Lifespan) - Investment) / Investment")
+                                        ),
+                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "NPV (Net Present Value)"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Σ [ Cash Flow / (1 + r)^t ] - Initial Investment"),
+                                            React.createElement("div", { className: "mt-1 text-xs italic" }, "*Where ", React.createElement("strong", null, "r"), " = Discount Rate and ", React.createElement("strong", null, "t"), " = Year.")
+                                        ),
+                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Payback Period"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Initial Investment / Annualized Incremental Revenue")
+                                        )
+                                    )
+                                )
+                            ),
+                            React.createElement("div", { className: "mt-8 text-xs text-gray-400 text-center" },
+                                "*All projections assume linear distribution of traffic over the selected lifespan. Seasonality is not currently applied to the annualized projection."
                             )
                         )
                     )
@@ -685,7 +689,7 @@ ${scriptContent}
     
     </script>
 </head>
-<body class="bg-gray-50">
+<body class="bg-[#F5F5F5]">
     <div id="root"></div>
 </body>
 </html>

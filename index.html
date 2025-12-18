@@ -30,14 +30,32 @@
             TrendingUp, TrendingDown, Users, DollarSign, AlertCircle, 
             Calendar, Settings, Info, PieChart, Calculator, Clock, 
             Activity, Share2, Link as LinkIcon, Check, Download, FileText, Code,
-            TrainFront, Sigma
+            TrainFront, Sigma, Store, Globe, Smartphone, MoreHorizontal
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         // --- CONFIGURATION DATA ---
+        // Types: 'digital' (Traffic * CR) vs 'direct' (Transactions only)
         const INITIAL_CHANNELS = {
-            web: { id: 'web', name: 'Website', traffic: 150000, cr: 15.0, bizShare: 50, returnMix: 40, avgGroupSize: 1.2 },
-            app: { id: 'app', name: 'App', traffic: 30000, cr: 50.0, bizShare: 50, returnMix: 30, avgGroupSize: 1.0 },
-            kiosk: { id: 'kiosk', name: 'Kiosks', traffic: 15000, cr: 90.0, bizShare: 50, returnMix: 50, avgGroupSize: 1.5 }
+            web: { 
+                id: 'web', type: 'digital', name: 'Website', icon: Globe,
+                traffic: 150000, cr: 15.0, 
+                bizShare: 50, returnMix: 40, avgGroupSize: 1.2 
+            },
+            app: { 
+                id: 'app', type: 'digital', name: 'App', icon: Smartphone,
+                traffic: 30000, cr: 50.0, 
+                bizShare: 50, returnMix: 30, avgGroupSize: 1.0 
+            },
+            kiosk: { 
+                id: 'kiosk', type: 'direct', name: 'Kiosks', icon: Store,
+                baselineTransactions: 13500, // Direct Sales Input
+                bizShare: 50, returnMix: 50, avgGroupSize: 1.5 
+            },
+            other: { 
+                id: 'other', type: 'direct', name: 'Other / B2B', icon: MoreHorizontal,
+                baselineTransactions: 3200, // Approx 6% share
+                bizShare: 80, returnMix: 20, avgGroupSize: 1.1 
+            }
         };
 
         const DEFAULT_TICKET_PRICES = { adult: 340, pensioner: 210, youth: 160, child: 160 };
@@ -195,10 +213,23 @@ ${scriptContent}
             const yieldLei = calculateYield(leisureMix);
 
             const calculateChannelMetrics = (channelData, scenarioData, applyScenario = false) => {
-                let { traffic, cr, bizShare, returnMix, avgGroupSize } = channelData;
+                let { type, traffic, cr, baselineTransactions, bizShare, returnMix, avgGroupSize } = channelData;
                 let channelYieldBiz = yieldBiz;
                 let channelYieldLei = yieldLei;
                 
+                // Determine Transactions (Digital vs Direct)
+                let transactions = 0;
+                let effectiveTraffic = traffic; // Only relevant for digital
+                let effectiveCR = cr; // Only relevant for digital
+
+                if (type === 'digital') {
+                     transactions = traffic * (cr / 100);
+                } else {
+                     transactions = baselineTransactions;
+                     effectiveTraffic = null; // No traffic concept
+                     effectiveCR = null; // No CR concept
+                }
+
                 if (applyScenario && scenarioData.active) {
                     const isTargetChannel = scenarioData.targetChannel === 'all' || scenarioData.targetChannel === channelData.id;
                     if (isTargetChannel) {
@@ -206,22 +237,38 @@ ${scriptContent}
                         const impactCR = 1 + (scenarioData.crImpact / 100);
                         const impactTraffic = 1 + (scenarioData.trafficImpact / 100);
 
-                        traffic = traffic * impactTraffic;
-                        
+                        // Yield Impact applies to all channel types
                         if (scenarioData.targetSegment === 'business' || scenarioData.targetSegment === 'both') {
                             channelYieldBiz *= impactYield;
-                            const crUplift = cr * (bizShare / 100) * (impactCR - 1);
-                            cr += crUplift;
                         }
                         if (scenarioData.targetSegment === 'leisure' || scenarioData.targetSegment === 'both') {
                             channelYieldLei *= impactYield;
-                            const crUplift = cr * ((100 - bizShare) / 100) * (impactCR - 1);
-                            cr += crUplift;
+                        }
+
+                        if (type === 'digital') {
+                            // Digital: Traffic Volume affects Traffic, CR Uplift affects CR
+                            effectiveTraffic = traffic * impactTraffic;
+                            
+                            // CR Uplift Logic (Weighted by Segment)
+                            let crUpliftFactor = 1;
+                            if (scenarioData.targetSegment === 'business' || scenarioData.targetSegment === 'both') {
+                                crUpliftFactor += (bizShare/100) * (impactCR - 1);
+                            } 
+                            if (scenarioData.targetSegment === 'leisure' || scenarioData.targetSegment === 'both') {
+                                crUpliftFactor += ((100 - bizShare)/100) * (impactCR - 1);
+                            }
+                            // Note: This is a simplified blended uplift. 
+                            effectiveCR = cr * crUpliftFactor;
+                            transactions = effectiveTraffic * (effectiveCR / 100);
+
+                        } else {
+                            // Direct (Kiosk/Other): Traffic Volume slider acts as VOLUME slider
+                            // CR Slider is IGNORED for direct channels
+                            transactions = baselineTransactions * impactTraffic;
                         }
                     }
                 }
 
-                const transactions = traffic * (cr / 100);
                 const totalTickets = transactions * avgGroupSize;
                 const tripsPerTicket = ((100 - returnMix) / 100 * 1) + (returnMix / 100 * 2);
                 const totalPax = totalTickets * tripsPerTicket;
@@ -230,7 +277,13 @@ ${scriptContent}
                 const revenueBiz = ticketsBiz * channelYieldBiz * tripsPerTicket;
                 const revenueLei = ticketsLei * channelYieldLei * tripsPerTicket;
                 
-                return { transactions, totalPax, revenue: revenueBiz + revenueLei, effectiveCR: cr, effectiveTraffic: traffic };
+                return { 
+                    transactions, 
+                    totalPax, 
+                    revenue: revenueBiz + revenueLei, 
+                    effectiveCR, 
+                    effectiveTraffic 
+                };
             };
 
             const results = useMemo(() => {
@@ -406,9 +459,9 @@ ${scriptContent}
                                                     React.createElement("label", { className: "block text-xs font-bold text-gray-400 uppercase mb-1" }, "Channel Scope"),
                                                     React.createElement("select", { value: scenario.targetChannel, onChange: e => setScenario({...scenario, targetChannel: e.target.value}), className: "w-full border border-gray-300 p-2 text-sm" },
                                                         React.createElement("option", { value: "all" }, "All Channels"),
-                                                        React.createElement("option", { value: "web" }, "Website"),
-                                                        React.createElement("option", { value: "app" }, "App"),
-                                                        React.createElement("option", { value: "kiosk" }, "Kiosks")
+                                                        Object.values(channels).map(c => 
+                                                            React.createElement("option", { key: c.id, value: c.id }, c.name)
+                                                        )
                                                     )
                                                 ),
                                                 React.createElement("div", null,
@@ -428,10 +481,10 @@ ${scriptContent}
                                                     React.createElement(SliderInput, { label: "Yield (Price)", value: scenario.yieldImpact, onChange: v => setScenario({...scenario, yieldImpact: v}), min: -50, max: 50, step: 1, unit: "%", tooltip: "Impact on average ticket price/yield." })
                                                 ),
                                                 React.createElement("div", null,
-                                                    React.createElement(SliderInput, { label: "Conversion Rate", value: scenario.crImpact, onChange: v => setScenario({...scenario, crImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on purchase conversion." })
+                                                    React.createElement(SliderInput, { label: "Conversion Rate", value: scenario.crImpact, onChange: v => setScenario({...scenario, crImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on purchase conversion. (Digital Only)" })
                                                 ),
                                                 React.createElement("div", null,
-                                                    React.createElement(SliderInput, { label: "Traffic Volume", value: scenario.trafficImpact, onChange: v => setScenario({...scenario, trafficImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on visitor numbers." })
+                                                    React.createElement(SliderInput, { label: "Volume / Traffic", value: scenario.trafficImpact, onChange: v => setScenario({...scenario, trafficImpact: v}), min: -50, max: 100, step: 1, unit: "%", tooltip: "Impact on Traffic (Digital) or Sales Volume (Direct)." })
                                                 )
                                             )
                                         )
@@ -563,35 +616,49 @@ ${scriptContent}
                                 React.createElement(Settings, { className: "w-5 h-5" }),
                                 "Channel Baselines (Monthly)"
                             ),
-                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-6" },
+                            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" },
                                 Object.values(channels).map(channel => {
                                     const metrics = results.channelDetails[channel.id];
                                     const isImpacted = scenario.active && (scenario.targetChannel === 'all' || scenario.targetChannel === channel.id);
+                                    
                                     return React.createElement(Card, { key: channel.id, className: `overflow-hidden ${isImpacted ? 'ring-2 ring-arlanda-yellow' : ''}` },
                                         React.createElement("div", { className: `px-4 py-3 border-b flex justify-between items-center ${channel.id === 'web' ? 'bg-arlanda-dark text-white' : 'bg-gray-100 text-gray-700'}` },
-                                            React.createElement("span", { className: "font-bold uppercase" }, channel.name),
-                                            isImpacted && React.createElement("span", { className: "text-[10px] bg-arlanda-yellow text-black px-2 py-0.5 rounded font-bold uppercase" }, "Active Target")
+                                            React.createElement("div", { className: "flex items-center gap-2" },
+                                                channel.icon && React.createElement(channel.icon, { className: "w-4 h-4" }),
+                                                React.createElement("span", { className: "font-bold uppercase text-xs" }, channel.name)
+                                            ),
+                                            isImpacted && React.createElement("span", { className: "text-[10px] bg-arlanda-yellow text-black px-2 py-0.5 rounded font-bold uppercase" }, "Active")
                                         ),
                                         React.createElement("div", { className: "p-4 space-y-6" },
                                             React.createElement("div", null,
-                                                React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Traffic & Conversion"),
-                                                React.createElement(NumberInput, { label: "Monthly Traffic", value: channel.traffic, onChange: v => updateChannel(channel.id, 'traffic', v) }),
-                                                isImpacted && metrics.sim.effectiveTraffic !== channel.traffic && 
-                                                    React.createElement("div", { className: "mb-3 text-right" },
-                                                        React.createElement("span", { className: "text-xs text-gray-500 mr-1" }, "Simulated Traffic:"),
-                                                        React.createElement("span", { className: `text-xs font-bold ${metrics.sim.effectiveTraffic > channel.traffic ? 'text-green-600' : 'text-red-600'}` }, 
-                                                            `${fmtNum(metrics.sim.effectiveTraffic)} (${fmtDiff(metrics.sim.effectiveTraffic - channel.traffic)})`
-                                                        )
-                                                    ),
-                                                React.createElement("div", { className: "flex gap-4" },
-                                                    React.createElement("div", { className: "flex-1" },
-                                                        React.createElement(NumberInput, { label: "Baseline CR (%)", value: channel.cr, onChange: v => updateChannel(channel.id, 'cr', v) })
-                                                    ),
-                                                    React.createElement("div", { className: "flex-1 pt-6" },
+                                                React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Volume & Conversion"),
+                                                
+                                                channel.type === 'digital' ? 
+                                                    // DIGITAL INPUTS
+                                                    React.createElement(React.Fragment, null,
+                                                        React.createElement(NumberInput, { label: "Monthly Traffic", value: channel.traffic, onChange: v => updateChannel(channel.id, 'traffic', v) }),
+                                                        isImpacted && metrics.sim.effectiveTraffic !== channel.traffic && 
+                                                            React.createElement("div", { className: "mb-3 text-right" },
+                                                                React.createElement("span", { className: `text-xs font-bold ${metrics.sim.effectiveTraffic > channel.traffic ? 'text-green-600' : 'text-red-600'}` }, 
+                                                                    `Sim: ${fmtNum(metrics.sim.effectiveTraffic)}`
+                                                                )
+                                                            ),
+                                                        React.createElement(NumberInput, { label: "Baseline CR (%)", value: channel.cr, onChange: v => updateChannel(channel.id, 'cr', v) }),
                                                         isImpacted && metrics.sim.effectiveCR !== metrics.base.effectiveCR && 
-                                                        React.createElement("div", { className: "text-xs font-bold text-gray-700 bg-arlanda-yellow p-1 rounded text-center" }, `Scenario: ${metrics.sim.effectiveCR.toFixed(1)}%`)
+                                                        React.createElement("div", { className: "text-xs font-bold text-gray-700 bg-arlanda-yellow p-1 rounded text-center" }, `Scenario CR: ${metrics.sim.effectiveCR.toFixed(1)}%`)
                                                     )
-                                                )
+                                                :
+                                                    // DIRECT INPUTS
+                                                    React.createElement(React.Fragment, null,
+                                                        React.createElement(NumberInput, { label: "Monthly Transactions", value: channel.baselineTransactions, onChange: v => updateChannel(channel.id, 'baselineTransactions', v) }),
+                                                        isImpacted && metrics.sim.transactions !== metrics.base.transactions && 
+                                                            React.createElement("div", { className: "mb-3 text-right" },
+                                                                React.createElement("span", { className: `text-xs font-bold ${metrics.sim.transactions > metrics.base.transactions ? 'text-green-600' : 'text-red-600'}` }, 
+                                                                    `Sim: ${fmtNum(metrics.sim.transactions)}`
+                                                                )
+                                                            ),
+                                                        React.createElement("div", { className: "text-xs text-gray-400 italic mt-2" }, "Direct sales channel. No CR applicable.")
+                                                    )
                                             ),
                                             React.createElement("div", null,
                                                 React.createElement("h4", { className: "text-xs font-bold text-gray-400 uppercase mb-3 border-b pb-1" }, "Segmentation"),
@@ -630,7 +697,7 @@ ${scriptContent}
                             )
                         ),
 
-                        // --- NEW CFO / LOGIC FOOTER ---
+                        // LOGIC FOOTER
                         React.createElement("div", { className: "mt-12 border-t-2 border-gray-200 pt-8 pb-12" },
                             React.createElement("h3", { className: "text-lg font-bold text-gray-800 mb-6 flex items-center gap-2" },
                                 React.createElement(Info, { className: "w-5 h-5 text-arlanda-yellow" }),
@@ -642,16 +709,18 @@ ${scriptContent}
                                     React.createElement("h4", { className: "font-bold text-gray-900 uppercase mb-3 text-xs tracking-wider" }, "Operational Metrics"),
                                     React.createElement("ul", { className: "space-y-3" },
                                         React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
-                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Total PAX (Passengers)"),
-                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Traffic × CR% × Avg Group Size × Trip Factor"),
-                                            React.createElement("div", { className: "mt-1 text-xs italic" }, "*Trip Factor accounts for return tickets (1 Return Ticket = 2 PAX trips).")
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Digital Channels (Web/App)"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Traffic × Conversion Rate % × Avg Group Size"),
                                         ),
                                         React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
-                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Weighted Yield (Avg Price)"),
-                                            React.createElement("div", { className: "text-xs space-y-1" },
-                                                React.createElement("div", null, React.createElement("strong", null, "Business Segment:"), " Always priced at Adult Single Rate."),
-                                                React.createElement("div", null, React.createElement("strong", null, "Leisure Segment:"), " Weighted average of Adult/Pensioner/Youth/Child mix.")
-                                            )
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Direct Channels (Kiosk/Other)"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Transactions (Direct Input) × Avg Group Size"),
+                                            React.createElement("div", { className: "mt-1 text-xs italic" }, "*CR Uplift scenarios are ignored for Direct channels.")
+                                        ),
+                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
+                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Total PAX (Passengers)"),
+                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Transactions × Avg Group Size × Trip Factor"),
+                                            React.createElement("div", { className: "mt-1 text-xs italic" }, "*Trip Factor accounts for return tickets (1 Return Ticket = 2 PAX trips).")
                                         )
                                     )
                                 ),
@@ -667,10 +736,6 @@ ${scriptContent}
                                             React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "NPV (Net Present Value)"),
                                             React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Σ [ Cash Flow / (1 + r)^t ] - Initial Investment"),
                                             React.createElement("div", { className: "mt-1 text-xs italic" }, "*Where ", React.createElement("strong", null, "r"), " = Discount Rate and ", React.createElement("strong", null, "t"), " = Year.")
-                                        ),
-                                        React.createElement("li", { className: "bg-white p-3 border border-gray-200 shadow-sm" },
-                                            React.createElement("span", { className: "font-bold block text-gray-800 mb-1" }, "Payback Period"),
-                                            React.createElement("code", { className: "text-xs bg-gray-100 p-1 block" }, "Initial Investment / Annualized Incremental Revenue")
                                         )
                                     )
                                 )
